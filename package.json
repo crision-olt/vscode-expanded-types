@@ -5,11 +5,14 @@
   "version": "0.0.1",
   "publisher": "crision98",
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
+  "categories": ["Other", "TypeScript"],
+  "keywords": ["typescript", "types", "hover", "expand", "developer tools"],
   "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:typescript",
-    "onLanguage:typescriptreact"
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact"
   ],
   "contributes": {
     "typescriptServerPlugins": [
@@ -22,6 +25,10 @@
       {
         "command": "expandedTypes.toggle",
         "title": "Expanded Types: Toggle"
+      },
+      {
+        "command": "expandedTypes.copyAtCursor",
+        "title": "Expanded Types: Copy Expanded Type at Cursor"
       }
     ],
     "keybindings": [
@@ -30,7 +37,29 @@
         "key": "ctrl+alt+e",
         "mac": "ctrl+alt+e"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Expanded Types",
+      "properties": {
+        "expandedTypes.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether expanded type display is active. Persisted across reloads."
+        },
+        "expandedTypes.maxDepth": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum recursion depth when expanding types. Higher values expand more but may be slow on complex types."
+        },
+        "expandedTypes.keepOriginalDocs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show original JSDoc documentation above the expanded type block."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node build.mjs",
