@@ -90,9 +90,10 @@ function init(modules: { typescript: typeof ts }) {
         };
       }
 
+      const baseDocs = keepOriginalDocs ? (original.documentation ?? []) : [];
       return {
         ...original,
-        documentation: [...(original.documentation ?? []), expandedDoc],
+        documentation: [...baseDocs, expandedDoc],
       };
     };
 
