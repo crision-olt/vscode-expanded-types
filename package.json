@@ -3,6 +3,7 @@
   "displayName": "Expanded Types",
   "description": "Deep-expand TypeScript types in hover tooltips",
   "version": "0.0.1",
+  "publisher": "crision98",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
   "main": "./out/extension.js",

@@ -5,3 +5,6 @@ tests/**
 *.mjs
 tsconfig.json
 .vscodeignore
+package-lock.json
+.claude/**
+docs/**
