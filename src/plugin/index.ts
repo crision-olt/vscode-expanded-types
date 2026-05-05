@@ -1,7 +1,90 @@
 import type * as ts from 'typescript';
-function init(_modules: { typescript: typeof ts }) {
-  function create() { return {}; }
-  function onConfigurationChanged(_config: unknown) {}
+import { expandType } from './expander';
+
+function init(modules: { typescript: typeof ts }) {
+  const tsModule = modules.typescript;
+  let enabled = false;
+
+  function create(info: ts.server.PluginCreateInfo): ts.LanguageService {
+    const proxy: ts.LanguageService = Object.create(null);
+    const ls = info.languageService;
+
+    for (const k of Object.keys(ls) as Array<keyof ts.LanguageService>) {
+      const x = ls[k];
+      if (typeof x === 'function') {
+        (proxy as any)[k] = (...args: any[]) => (x as any).apply(ls, args);
+      }
+    }
+
+    proxy.getQuickInfoAtPosition = (fileName: string, position: number) => {
+      const original = ls.getQuickInfoAtPosition(fileName, position);
+      if (!enabled) return original;
+
+      const program = ls.getProgram();
+      if (!program) return original;
+
+      const sourceFile = program.getSourceFile(fileName);
+      if (!sourceFile) return original;
+
+      const checker = program.getTypeChecker();
+      const node = findNodeAtPosition(sourceFile, position, tsModule);
+      if (!node) return original;
+
+      let type: ts.Type;
+      try {
+        type = checker.getTypeAtLocation(node);
+      } catch {
+        return original;
+      }
+
+      let expanded: string;
+      try {
+        expanded = expandType(type, checker, tsModule, new Set());
+      } catch {
+        return original;
+      }
+
+      if (!original) {
+        return {
+          kind: '' as ts.ScriptElementKind,
+          kindModifiers: '',
+          textSpan: { start: position, length: 1 },
+          displayParts: [],
+          documentation: [{ text: '```typescript\n' + expanded + '\n```', kind: 'text' }],
+          tags: [],
+        };
+      }
+
+      return {
+        ...original,
+        documentation: [{ text: '```typescript\n' + expanded + '\n```', kind: 'text' }],
+      };
+    };
+
+    return proxy;
+  }
+
+  function onConfigurationChanged(config: { enabled?: boolean }) {
+    if (typeof config.enabled === 'boolean') {
+      enabled = config.enabled;
+    }
+  }
+
   return { create, onConfigurationChanged };
 }
+
+function findNodeAtPosition(
+  sourceFile: ts.SourceFile,
+  position: number,
+  tsModule: typeof ts,
+): ts.Node | undefined {
+  function find(node: ts.Node): ts.Node | undefined {
+    if (position >= node.getStart(sourceFile) && position < node.getEnd()) {
+      return tsModule.forEachChild(node, find) ?? node;
+    }
+    return undefined;
+  }
+  return find(sourceFile);
+}
+
 module.exports = init;
