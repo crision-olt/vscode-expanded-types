@@ -90,7 +90,7 @@ function init(modules: { typescript: typeof ts }) {
 
       return {
         ...original,
-        documentation: [expandedDoc],
+        documentation: [...(original.documentation ?? []), expandedDoc],
       };
     };
 
