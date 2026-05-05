@@ -1,6 +1,21 @@
 import type * as ts from 'typescript';
 import { expandType } from './expander';
 
+function buildCodeContent(original: ts.QuickInfo | undefined, expanded: string): string {
+  const parts = original?.displayParts ?? [];
+  let eqIdx = -1;
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if ((p.kind === 'operator' || p.kind === 'punctuation') && p.text === '=') {
+      eqIdx = i;
+      break;
+    }
+  }
+  if (eqIdx < 0) return expanded;
+  const prefix = parts.slice(0, eqIdx).map(p => p.text).join('').trimEnd() + ' = ';
+  return prefix + expanded;
+}
+
 function init(modules: { typescript: typeof ts }) {
   const tsModule = modules.typescript;
   let enabled = false;
@@ -57,20 +72,25 @@ function init(modules: { typescript: typeof ts }) {
         return original;
       }
 
+      const expandedDoc: ts.SymbolDisplayPart = {
+        text: '```typescript\n' + buildCodeContent(original, expanded) + '\n```',
+        kind: 'markdown',
+      };
+
       if (!original) {
         return {
           kind: '' as ts.ScriptElementKind,
           kindModifiers: '',
           textSpan: { start: position, length: 1 },
           displayParts: [],
-          documentation: [{ text: '```typescript\n' + expanded + '\n```', kind: 'text' }],
+          documentation: [expandedDoc],
           tags: [],
         };
       }
 
       return {
         ...original,
-        documentation: [{ text: '```typescript\n' + expanded + '\n```', kind: 'text' }],
+        documentation: [expandedDoc],
       };
     };
 
