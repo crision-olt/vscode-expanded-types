@@ -44,12 +44,6 @@ export function expandType(
     return checker.typeToString(type);
   }
 
-  // Guard object expansion against circular references using the type id
-  const typeId = (type as ts.Type & { id?: number }).id;
-  if (typeId !== undefined && visited.has(type)) {
-    return checker.typeToString(type);
-  }
-
   const props = type.getProperties();
   if (props.length > 0) {
     return expandObjectType(type, checker, tsModule, visited, SymbolFlags);
@@ -73,13 +67,19 @@ function expandObjectType(
   const props = type.getProperties();
   const parts = props.map(prop => {
     const isOptional = !!(prop.flags & SymbolFlags.Optional);
-    let propType = checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration!);
+    const node = prop.valueDeclaration ?? prop.declarations?.[0];
+    let propType = node
+      ? checker.getTypeOfSymbolAtLocation(prop, node)
+      : checker.getTypeOfSymbol(prop);
     // Strip the implicit `undefined` that TypeScript adds to optional properties
     if (isOptional && propType.isUnion()) {
       const { TypeFlags } = tsModule;
-      const nonUndefinedTypes = propType.types.filter(t => !(t.flags & TypeFlags.Undefined));
-      if (nonUndefinedTypes.length === 1) {
-        propType = nonUndefinedTypes[0];
+      const nonUndefined = propType.types.filter(t => !(t.flags & TypeFlags.Undefined));
+      if (nonUndefined.length === 1) {
+        propType = nonUndefined[0];
+      } else if (nonUndefined.length > 1) {
+        const expanded = nonUndefined.map(t => expandType(t, checker, tsModule, visited)).join(' | ');
+        return `${prop.getName()}?: ${expanded}`;
       }
     }
     const expanded = expandType(propType, checker, tsModule, visited);

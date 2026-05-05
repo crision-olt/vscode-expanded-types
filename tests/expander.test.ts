@@ -107,6 +107,5 @@ describe('expandType', () => {
     const type = checker.getTypeAtLocation(decl);
     const result = expandType(type, checker, ts, new Set());
     expect(result).toContain('value: string');
-    expect(result).not.toThrow;
   });
 });
