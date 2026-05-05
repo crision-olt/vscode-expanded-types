@@ -32,7 +32,11 @@ function updateStatusBar(item: vscode.StatusBarItem): void {
 function syncPlugin(): void {
   const tsExt = vscode.extensions.getExtension('vscode.typescript-language-features');
   if (!tsExt) return;
-  const api = (tsExt.exports as any)?.getAPI(0);
-  if (!api) return;
-  api.configurePlugin('./out/plugin', { enabled });
+  try {
+    const api = (tsExt.exports as any)?.getAPI(0);
+    if (!api) return;
+    api.configurePlugin('./out/plugin', { enabled });
+  } catch {
+    // TypeScript Language Features API unavailable — silently skip
+  }
 }
