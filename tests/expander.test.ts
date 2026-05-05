@@ -59,17 +59,17 @@ describe('expandType', () => {
 
   it('expands flat object type', () => {
     const { type, checker } = getTypeFromDecl('const x: { a: string; b: number } = { a: "", b: 0 };');
-    expect(expandType(type, checker, ts, new Set())).toBe('{ a: string; b: number }');
+    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a: string;\n  b: number;\n}');
   });
 
   it('expands nested object type', () => {
     const { type, checker } = getTypeFromDecl('const x: { a: { b: string } } = { a: { b: "" } };');
-    expect(expandType(type, checker, ts, new Set())).toBe('{ a: { b: string } }');
+    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a: {\n    b: string;\n  };\n}');
   });
 
   it('expands object with optional property', () => {
     const { type, checker } = getTypeFromDecl('const x: { a?: string } = {};');
-    expect(expandType(type, checker, ts, new Set())).toBe('{ a?: string }');
+    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a?: string;\n}');
   });
 
   it('expands union of primitives', () => {
@@ -81,7 +81,92 @@ describe('expandType', () => {
   it('expands union with object', () => {
     const { type, checker } = getTypeFromDecl('const x: string | { a: number } = "";');
     const result = expandType(type, checker, ts, new Set());
-    expect(result).toBe('string | { a: number }');
+    expect(result).toBe('string\n| {\n  a: number;\n}');
+  });
+
+  it('expands named interface references deeply', () => {
+    const code = `
+      interface Inner { b: string; c: number; }
+      interface Outer { a: Inner; }
+      const x: Outer = { a: { b: '', c: 0 } };
+    `;
+    const filename = '/virtual/test.ts';
+    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+    const defaultHost = ts.createCompilerHost({});
+    const host: ts.CompilerHost = {
+      ...defaultHost,
+      getSourceFile: (name, version) =>
+        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
+      fileExists: (name) => name === filename || defaultHost.fileExists(name),
+      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
+    };
+    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
+    const checker = program.getTypeChecker();
+    const sf = program.getSourceFile(filename)!;
+    const stmt = sf.statements[2] as ts.VariableStatement;
+    const decl = stmt.declarationList.declarations[0];
+    const type = checker.getTypeAtLocation(decl);
+    const result = expandType(type, checker, ts, new Set());
+    expect(result).toBe('{\n  a: {\n    b: string;\n    c: number;\n  };\n}');
+  });
+
+  it('expands generic type instantiation', () => {
+    const code = `
+      interface Inner { b: string; c: number; }
+      interface Wrapper<T> { value: T; count: number; }
+      const x: Wrapper<Inner> = { value: { b: '', c: 0 }, count: 1 };
+    `;
+    const filename = '/virtual/test.ts';
+    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+    const defaultHost = ts.createCompilerHost({});
+    const host: ts.CompilerHost = {
+      ...defaultHost,
+      getSourceFile: (name, version) =>
+        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
+      fileExists: (name) => name === filename || defaultHost.fileExists(name),
+      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
+    };
+    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
+    const checker = program.getTypeChecker();
+    const sf = program.getSourceFile(filename)!;
+    const stmt = sf.statements[2] as ts.VariableStatement;
+    const decl = stmt.declarationList.declarations[0];
+    const type = checker.getTypeAtLocation(decl);
+    const result = expandType(type, checker, ts, new Set());
+    // value: T should expand to { b: string; c: number }, not show as "T" or "Inner"
+    expect(result).toContain('b: string');
+    expect(result).toContain('c: number');
+  });
+
+  it('merges object intersection into flat object', () => {
+    const { type, checker } = getTypeFromDecl('const x: { a: string } & { b: number } = { a: "", b: 0 };');
+    const result = expandType(type, checker, ts, new Set());
+    expect(result).toBe('{\n  a: string;\n  b: number;\n}');
+  });
+
+  it('expands array of named type', () => {
+    const code = `
+      interface Item { id: number; name: string; }
+      const x: Item[] = [];
+    `;
+    const filename = '/virtual/test.ts';
+    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+    const defaultHost = ts.createCompilerHost({});
+    const host: ts.CompilerHost = {
+      ...defaultHost,
+      getSourceFile: (name, version) =>
+        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
+      fileExists: (name) => name === filename || defaultHost.fileExists(name),
+      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
+    };
+    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
+    const checker = program.getTypeChecker();
+    const sf = program.getSourceFile(filename)!;
+    const stmt = sf.statements[1] as ts.VariableStatement;
+    const decl = stmt.declarationList.declarations[0];
+    const type = checker.getTypeAtLocation(decl);
+    const result = expandType(type, checker, ts, new Set());
+    expect(result).toBe('{\n  id: number;\n  name: string;\n}[]');
   });
 
   it('handles circular reference gracefully', () => {

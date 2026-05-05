@@ -4,8 +4,13 @@ import { expandType } from './expander';
 function init(modules: { typescript: typeof ts }) {
   const tsModule = modules.typescript;
   let enabled = false;
+  let log: (msg: string) => void = () => {};
 
   function create(info: ts.server.PluginCreateInfo): ts.LanguageService {
+    log = (msg: string) => {
+      try { info.project.projectService.logger.info(`[expanded-types] ${msg}`); } catch {}
+    };
+    log('plugin loaded, enabled=' + String(enabled));
     const proxy: ts.LanguageService = Object.create(null);
     const ls = info.languageService;
 
@@ -73,6 +78,7 @@ function init(modules: { typescript: typeof ts }) {
   }
 
   function onConfigurationChanged(config: { enabled?: boolean }) {
+    log('onConfigurationChanged: ' + JSON.stringify(config));
     if (typeof config.enabled === 'boolean') {
       enabled = config.enabled;
     }
