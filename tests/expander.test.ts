@@ -21,6 +21,25 @@ function getTypeFromDecl(code: string): { type: ts.Type; checker: ts.TypeChecker
   return { type: checker.getTypeAtLocation(decl), checker };
 }
 
+function getTypeFromMultiDecl(code: string, stmtIndex: number): { type: ts.Type; checker: ts.TypeChecker } {
+  const filename = '/virtual/test.ts';
+  const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+  const defaultHost = ts.createCompilerHost({});
+  const host: ts.CompilerHost = {
+    ...defaultHost,
+    getSourceFile: (name, version) =>
+      name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
+    fileExists: (name) => name === filename || defaultHost.fileExists(name),
+    readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
+  };
+  const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
+  const checker = program.getTypeChecker();
+  const sf = program.getSourceFile(filename)!;
+  const stmt = sf.statements[stmtIndex] as ts.VariableStatement;
+  const decl = stmt.declarationList.declarations[0];
+  return { type: checker.getTypeAtLocation(decl), checker };
+}
+
 describe('expandType', () => {
   it('expands string primitive', () => {
     const { type, checker } = getTypeFromDecl('const x: string = "";');
@@ -90,22 +109,7 @@ describe('expandType', () => {
       interface Outer { a: Inner; }
       const x: Outer = { a: { b: '', c: 0 } };
     `;
-    const filename = '/virtual/test.ts';
-    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
-    const defaultHost = ts.createCompilerHost({});
-    const host: ts.CompilerHost = {
-      ...defaultHost,
-      getSourceFile: (name, version) =>
-        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
-      fileExists: (name) => name === filename || defaultHost.fileExists(name),
-      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
-    };
-    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
-    const checker = program.getTypeChecker();
-    const sf = program.getSourceFile(filename)!;
-    const stmt = sf.statements[2] as ts.VariableStatement;
-    const decl = stmt.declarationList.declarations[0];
-    const type = checker.getTypeAtLocation(decl);
+    const { type, checker } = getTypeFromMultiDecl(code, 2);
     const result = expandType(type, checker, ts);
     expect(result).toBe('{\n  a: {\n    b: string;\n    c: number;\n  };\n}');
   });
@@ -116,22 +120,7 @@ describe('expandType', () => {
       interface Wrapper<T> { value: T; count: number; }
       const x: Wrapper<Inner> = { value: { b: '', c: 0 }, count: 1 };
     `;
-    const filename = '/virtual/test.ts';
-    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
-    const defaultHost = ts.createCompilerHost({});
-    const host: ts.CompilerHost = {
-      ...defaultHost,
-      getSourceFile: (name, version) =>
-        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
-      fileExists: (name) => name === filename || defaultHost.fileExists(name),
-      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
-    };
-    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
-    const checker = program.getTypeChecker();
-    const sf = program.getSourceFile(filename)!;
-    const stmt = sf.statements[2] as ts.VariableStatement;
-    const decl = stmt.declarationList.declarations[0];
-    const type = checker.getTypeAtLocation(decl);
+    const { type, checker } = getTypeFromMultiDecl(code, 2);
     const result = expandType(type, checker, ts);
     // value: T should expand to { b: string; c: number }, not show as "T" or "Inner"
     expect(result).toContain('b: string');
@@ -149,22 +138,7 @@ describe('expandType', () => {
       interface Item { id: number; name: string; }
       const x: Item[] = [];
     `;
-    const filename = '/virtual/test.ts';
-    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
-    const defaultHost = ts.createCompilerHost({});
-    const host: ts.CompilerHost = {
-      ...defaultHost,
-      getSourceFile: (name, version) =>
-        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
-      fileExists: (name) => name === filename || defaultHost.fileExists(name),
-      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
-    };
-    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
-    const checker = program.getTypeChecker();
-    const sf = program.getSourceFile(filename)!;
-    const stmt = sf.statements[1] as ts.VariableStatement;
-    const decl = stmt.declarationList.declarations[0];
-    const type = checker.getTypeAtLocation(decl);
+    const { type, checker } = getTypeFromMultiDecl(code, 1);
     const result = expandType(type, checker, ts);
     expect(result).toBe('{\n  id: number;\n  name: string;\n}[]');
   });
@@ -174,22 +148,7 @@ describe('expandType', () => {
       type Node = { value: string; next: Node | null };
       const x: Node = { value: "", next: null };
     `;
-    const filename = '/virtual/test.ts';
-    const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
-    const defaultHost = ts.createCompilerHost({});
-    const host: ts.CompilerHost = {
-      ...defaultHost,
-      getSourceFile: (name, version) =>
-        name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
-      fileExists: (name) => name === filename || defaultHost.fileExists(name),
-      readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
-    };
-    const program = ts.createProgram([filename], { strict: true, skipLibCheck: true, noLib: true }, host);
-    const checker = program.getTypeChecker();
-    const sf = program.getSourceFile(filename)!;
-    const stmt = sf.statements[1] as ts.VariableStatement;
-    const decl = stmt.declarationList.declarations[0];
-    const type = checker.getTypeAtLocation(decl);
+    const { type, checker } = getTypeFromMultiDecl(code, 1);
     const result = expandType(type, checker, ts);
     expect(result).toContain('value: string');
   });
@@ -203,5 +162,22 @@ describe('expandType', () => {
     expect(result).toContain('a:');
     expect(result).toContain('b:');
     expect(result).not.toMatch(/c:\s*\{/);
+  });
+
+  it('expands simple tuple', () => {
+    const { type, checker } = getTypeFromDecl('const x: [string, number] = ["", 0];');
+    const result = expandType(type, checker, ts);
+    expect(result).toBe('[string, number]');
+  });
+
+  it('expands tuple with named interface element', () => {
+    const code = `
+      interface Item { id: number; name: string; }
+      const x: [string, Item] = ["", { id: 0, name: "" }];
+    `;
+    const { type, checker } = getTypeFromMultiDecl(code, 1);
+    const result = expandType(type, checker, ts);
+    expect(result).toContain('[string,');
+    expect(result).toContain('id: number');
   });
 });

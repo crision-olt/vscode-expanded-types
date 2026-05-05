@@ -72,8 +72,8 @@ function _expandType(
     return parts.join(' & ');
   }
 
-  // Tuple types (ObjectFlags.Tuple = 8)
-  if ((type as any).objectFlags !== undefined && ((type as any).objectFlags & TUPLE_FLAG)) {
+  // Tuple types: the reference itself has ObjectFlags.Reference (4); its .target carries Tuple (8)
+  if ((type as any).target !== undefined && (((type as any).target.objectFlags ?? 0) & TUPLE_FLAG)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
       if (depth >= maxDepth) return '[ … ]';
