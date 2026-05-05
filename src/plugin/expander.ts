@@ -76,6 +76,7 @@ function _expandType(
   if ((type as any).objectFlags !== undefined && ((type as any).objectFlags & TUPLE_FLAG)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
+      if (depth >= maxDepth) return '[ … ]';
       const elements = args.map(t => _expandType(t, checker, tsModule, visited, depth + 1, maxDepth));
       return `[${elements.join(', ')}]`;
     }

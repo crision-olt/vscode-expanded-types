@@ -20,7 +20,7 @@ function init(modules: { typescript: typeof ts }) {
   const tsModule = modules.typescript;
   let enabled = false;
   let maxDepth = 5;
-  let keepOriginalDocs = true;
+  let keepOriginalDocs = true;  // controls whether original JSDoc is kept; applied in getQuickInfoAtPosition
   let log: (msg: string) => void = () => {};
 
   function create(info: ts.server.PluginCreateInfo): ts.LanguageService {
