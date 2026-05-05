@@ -9,15 +9,23 @@ function init(modules: { typescript: typeof ts }) {
     const proxy: ts.LanguageService = Object.create(null);
     const ls = info.languageService;
 
-    for (const k of Object.keys(ls) as Array<keyof ts.LanguageService>) {
-      const x = ls[k];
-      if (typeof x === 'function') {
-        (proxy as any)[k] = (...args: any[]) => (x as any).apply(ls, args);
+    let proto = Object.getPrototypeOf(ls) as object | null;
+    while (proto && proto !== Object.prototype) {
+      for (const k of Object.getOwnPropertyNames(proto) as Array<keyof ts.LanguageService>) {
+        if ((k as string) !== 'constructor' && typeof (ls as any)[k] === 'function' && !(proxy as any)[k]) {
+          (proxy as any)[k] = (...args: any[]) => (ls as any)[k].apply(ls, args);
+        }
       }
+      proto = Object.getPrototypeOf(proto) as object | null;
     }
 
     proxy.getQuickInfoAtPosition = (fileName: string, position: number) => {
-      const original = ls.getQuickInfoAtPosition(fileName, position);
+      let original: ts.QuickInfo | undefined;
+      try {
+        original = ls.getQuickInfoAtPosition(fileName, position);
+      } catch {
+        return undefined;
+      }
       if (!enabled) return original;
 
       const program = ls.getProgram();
