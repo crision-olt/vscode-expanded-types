@@ -24,63 +24,63 @@ function getTypeFromDecl(code: string): { type: ts.Type; checker: ts.TypeChecker
 describe('expandType', () => {
   it('expands string primitive', () => {
     const { type, checker } = getTypeFromDecl('const x: string = "";');
-    expect(expandType(type, checker, ts, new Set())).toBe('string');
+    expect(expandType(type, checker, ts)).toBe('string');
   });
 
   it('expands number primitive', () => {
     const { type, checker } = getTypeFromDecl('const x: number = 0;');
-    expect(expandType(type, checker, ts, new Set())).toBe('number');
+    expect(expandType(type, checker, ts)).toBe('number');
   });
 
   it('expands boolean primitive', () => {
     const { type, checker } = getTypeFromDecl('const x: boolean = true;');
-    expect(expandType(type, checker, ts, new Set())).toBe('boolean');
+    expect(expandType(type, checker, ts)).toBe('boolean');
   });
 
   it('expands null', () => {
     const { type, checker } = getTypeFromDecl('const x: null = null;');
-    expect(expandType(type, checker, ts, new Set())).toBe('null');
+    expect(expandType(type, checker, ts)).toBe('null');
   });
 
   it('expands undefined', () => {
     const { type, checker } = getTypeFromDecl('const x: undefined = undefined;');
-    expect(expandType(type, checker, ts, new Set())).toBe('undefined');
+    expect(expandType(type, checker, ts)).toBe('undefined');
   });
 
   it('expands string literal', () => {
     const { type, checker } = getTypeFromDecl('const x: "hello" = "hello";');
-    expect(expandType(type, checker, ts, new Set())).toBe('"hello"');
+    expect(expandType(type, checker, ts)).toBe('"hello"');
   });
 
   it('expands number literal', () => {
     const { type, checker } = getTypeFromDecl('const x: 42 = 42;');
-    expect(expandType(type, checker, ts, new Set())).toBe('42');
+    expect(expandType(type, checker, ts)).toBe('42');
   });
 
   it('expands flat object type', () => {
     const { type, checker } = getTypeFromDecl('const x: { a: string; b: number } = { a: "", b: 0 };');
-    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a: string;\n  b: number;\n}');
+    expect(expandType(type, checker, ts)).toBe('{\n  a: string;\n  b: number;\n}');
   });
 
   it('expands nested object type', () => {
     const { type, checker } = getTypeFromDecl('const x: { a: { b: string } } = { a: { b: "" } };');
-    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a: {\n    b: string;\n  };\n}');
+    expect(expandType(type, checker, ts)).toBe('{\n  a: {\n    b: string;\n  };\n}');
   });
 
   it('expands object with optional property', () => {
     const { type, checker } = getTypeFromDecl('const x: { a?: string } = {};');
-    expect(expandType(type, checker, ts, new Set())).toBe('{\n  a?: string;\n}');
+    expect(expandType(type, checker, ts)).toBe('{\n  a?: string;\n}');
   });
 
   it('expands union of primitives', () => {
     const { type, checker } = getTypeFromDecl('const x: string | number = "";');
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toBe('string | number');
   });
 
   it('expands union with object', () => {
     const { type, checker } = getTypeFromDecl('const x: string | { a: number } = "";');
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toBe('string\n| {\n  a: number;\n}');
   });
 
@@ -106,7 +106,7 @@ describe('expandType', () => {
     const stmt = sf.statements[2] as ts.VariableStatement;
     const decl = stmt.declarationList.declarations[0];
     const type = checker.getTypeAtLocation(decl);
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toBe('{\n  a: {\n    b: string;\n    c: number;\n  };\n}');
   });
 
@@ -132,7 +132,7 @@ describe('expandType', () => {
     const stmt = sf.statements[2] as ts.VariableStatement;
     const decl = stmt.declarationList.declarations[0];
     const type = checker.getTypeAtLocation(decl);
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     // value: T should expand to { b: string; c: number }, not show as "T" or "Inner"
     expect(result).toContain('b: string');
     expect(result).toContain('c: number');
@@ -140,7 +140,7 @@ describe('expandType', () => {
 
   it('merges object intersection into flat object', () => {
     const { type, checker } = getTypeFromDecl('const x: { a: string } & { b: number } = { a: "", b: 0 };');
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toBe('{\n  a: string;\n  b: number;\n}');
   });
 
@@ -165,7 +165,7 @@ describe('expandType', () => {
     const stmt = sf.statements[1] as ts.VariableStatement;
     const decl = stmt.declarationList.declarations[0];
     const type = checker.getTypeAtLocation(decl);
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toBe('{\n  id: number;\n  name: string;\n}[]');
   });
 
@@ -190,7 +190,18 @@ describe('expandType', () => {
     const stmt = sf.statements[1] as ts.VariableStatement;
     const decl = stmt.declarationList.declarations[0];
     const type = checker.getTypeAtLocation(decl);
-    const result = expandType(type, checker, ts, new Set());
+    const result = expandType(type, checker, ts);
     expect(result).toContain('value: string');
+  });
+
+  it('cuts off expansion at maxDepth and uses typeToString fallback', () => {
+    const { type, checker } = getTypeFromDecl(
+      'const x: { a: { b: { c: { d: string } } } } = { a: { b: { c: { d: "" } } } };',
+    );
+    // maxDepth=2: outer object is depth 0, `a` prop is depth 1, `b` prop is depth 2, `c` should NOT expand inline
+    const result = expandType(type, checker, ts, 2);
+    expect(result).toContain('a:');
+    expect(result).toContain('b:');
+    expect(result).not.toMatch(/c:\s*\{/);
   });
 });

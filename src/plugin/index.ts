@@ -19,6 +19,8 @@ function buildCodeContent(original: ts.QuickInfo | undefined, expanded: string):
 function init(modules: { typescript: typeof ts }) {
   const tsModule = modules.typescript;
   let enabled = false;
+  let maxDepth = 5;
+  let keepOriginalDocs = true;
   let log: (msg: string) => void = () => {};
 
   function create(info: ts.server.PluginCreateInfo): ts.LanguageService {
@@ -67,7 +69,7 @@ function init(modules: { typescript: typeof ts }) {
 
       let expanded: string;
       try {
-        expanded = expandType(type, checker, tsModule, new Set());
+        expanded = expandType(type, checker, tsModule, maxDepth);
       } catch {
         return original;
       }
@@ -97,10 +99,16 @@ function init(modules: { typescript: typeof ts }) {
     return proxy;
   }
 
-  function onConfigurationChanged(config: { enabled?: boolean }) {
+  function onConfigurationChanged(config: { enabled?: boolean; maxDepth?: number; keepOriginalDocs?: boolean }) {
     log('onConfigurationChanged: ' + JSON.stringify(config));
     if (typeof config.enabled === 'boolean') {
       enabled = config.enabled;
+    }
+    if (typeof config.maxDepth === 'number' && config.maxDepth > 0) {
+      maxDepth = config.maxDepth;
+    }
+    if (typeof config.keepOriginalDocs === 'boolean') {
+      keepOriginalDocs = config.keepOriginalDocs;
     }
   }
 

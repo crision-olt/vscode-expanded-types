@@ -8,13 +8,26 @@ const BUILTIN_NAMES = new Set([
 ]);
 
 const INDENT = '  ';
+const DEFAULT_MAX_DEPTH = 5;
+// ts.ObjectFlags.Tuple = 8 (public enum, not in our TsModule pick type)
+const TUPLE_FLAG = 8;
 
 export function expandType(
   type: ts.Type,
   checker: ts.TypeChecker,
   tsModule: TsModule,
+  maxDepth = DEFAULT_MAX_DEPTH,
+): string {
+  return _expandType(type, checker, tsModule, new Set(), 0, maxDepth);
+}
+
+function _expandType(
+  type: ts.Type,
+  checker: ts.TypeChecker,
+  tsModule: TsModule,
   visited: Set<ts.Type>,
-  depth = 0,
+  depth: number,
+  maxDepth: number,
 ): string {
   const { TypeFlags } = tsModule;
 
@@ -35,14 +48,13 @@ export function expandType(
   if (type.flags & TypeFlags.BigIntLiteral) return checker.typeToString(type);
 
   if (type.isUnion()) {
-    const { TypeFlags } = tsModule;
     const isNullish = (t: ts.Type) => !!(t.flags & (TypeFlags.Null | TypeFlags.Undefined));
     const sorted = [...type.types].sort((a, b) => {
       if (isNullish(a) && !isNullish(b)) return 1;
       if (!isNullish(a) && isNullish(b)) return -1;
       return 0;
     });
-    const parts = sorted.map(t => expandType(t, checker, tsModule, visited, depth));
+    const parts = sorted.map(t => _expandType(t, checker, tsModule, visited, depth, maxDepth));
     const hasObjects = parts.some(p => p.startsWith('{'));
     if (hasObjects) {
       const pad = INDENT.repeat(depth);
@@ -53,24 +65,33 @@ export function expandType(
 
   if (type.isIntersection()) {
     if (type.getProperties().length > 0) {
-      return expandObjectType(type, checker, tsModule, visited, depth);
+      if (depth >= maxDepth) return '{ … }';
+      return expandObjectType(type, checker, tsModule, visited, depth, maxDepth);
     }
-    const parts = type.types.map(t => expandType(t, checker, tsModule, visited, depth));
+    const parts = type.types.map(t => _expandType(t, checker, tsModule, visited, depth, maxDepth));
     return parts.join(' & ');
   }
 
-  // Expand array element types recursively instead of falling back to typeToString.
+  // Tuple types (ObjectFlags.Tuple = 8)
+  if ((type as any).objectFlags !== undefined && ((type as any).objectFlags & TUPLE_FLAG)) {
+    const args = checker.getTypeArguments(type as ts.TypeReference);
+    if (args.length > 0) {
+      const elements = args.map(t => _expandType(t, checker, tsModule, visited, depth + 1, maxDepth));
+      return `[${elements.join(', ')}]`;
+    }
+  }
+
   if (checker.isArrayType(type)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
-      const elem = expandType(args[0], checker, tsModule, visited, depth);
+      const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
       return elem.includes(' | ') ? `(${elem})[]` : `${elem}[]`;
     }
   }
   if ((checker as any).isReadonlyArrayType?.(type)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
-      const elem = expandType(args[0], checker, tsModule, visited, depth);
+      const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
       return elem.includes(' | ') ? `readonly (${elem})[]` : `readonly ${elem}[]`;
     }
   }
@@ -82,12 +103,13 @@ export function expandType(
 
   const callSigs = type.getCallSignatures();
   if (callSigs.length > 0 && type.getProperties().length === 0) {
-    return callSigs.map(sig => expandSignature(sig, checker, tsModule, visited, depth)).join(' | ');
+    return callSigs.map(sig => expandSignature(sig, checker, tsModule, visited, depth, maxDepth)).join(' | ');
   }
 
   const props = type.getProperties();
   if (props.length > 0) {
-    return expandObjectType(type, checker, tsModule, visited, depth);
+    if (depth >= maxDepth) return '{ … }';
+    return expandObjectType(type, checker, tsModule, visited, depth, maxDepth);
   }
 
   return checker.typeToString(type);
@@ -99,13 +121,14 @@ function expandSignature(
   tsModule: TsModule,
   visited: Set<ts.Type>,
   depth: number,
+  maxDepth: number,
 ): string {
   const params = sig.getParameters().map(p => {
     const node = p.valueDeclaration ?? p.declarations?.[0];
     const t = node ? checker.getTypeOfSymbolAtLocation(p, node) : checker.getTypeOfSymbol(p);
-    return `${p.getName()}: ${expandType(t, checker, tsModule, visited, depth)}`;
+    return `${p.getName()}: ${_expandType(t, checker, tsModule, visited, depth, maxDepth)}`;
   });
-  const ret = expandType(checker.getReturnTypeOfSignature(sig), checker, tsModule, visited, depth);
+  const ret = _expandType(checker.getReturnTypeOfSignature(sig), checker, tsModule, visited, depth, maxDepth);
   return `(${params.join(', ')}) => ${ret}`;
 }
 
@@ -115,6 +138,7 @@ function expandObjectType(
   tsModule: TsModule,
   visited: Set<ts.Type>,
   depth: number,
+  maxDepth: number,
 ): string {
   if (visited.has(type)) {
     return checker.typeToString(type);
@@ -143,12 +167,12 @@ function expandObjectType(
           const bN = !!(b.flags & TypeFlags.Null);
           return aN === bN ? 0 : aN ? 1 : -1;
         });
-        const expanded = sortedParts.map(t => expandType(t, checker, tsModule, visited, depth + 1)).join(' | ');
+        const expanded = sortedParts.map(t => _expandType(t, checker, tsModule, visited, depth + 1, maxDepth)).join(' | ');
         return `${indent}${prop.getName()}?: ${expanded}`;
       }
     }
 
-    const expanded = expandType(propType, checker, tsModule, visited, depth + 1);
+    const expanded = _expandType(propType, checker, tsModule, visited, depth + 1, maxDepth);
     return `${indent}${prop.getName()}${isOptional ? '?' : ''}: ${expanded}`;
   });
 
