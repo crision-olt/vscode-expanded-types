@@ -5,7 +5,7 @@
   "version": "0.0.1",
   "publisher": "crision98",
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other", "TypeScript"],
+  "categories": ["Other", "Programming Languages"],
   "keywords": ["typescript", "types", "hover", "expand", "developer tools"],
   "main": "./out/extension.js",
   "activationEvents": [
