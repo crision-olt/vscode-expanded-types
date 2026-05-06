@@ -98,8 +98,15 @@ function _expandType(
   }
 
   const symbol = type.getSymbol();
-  if (symbol && BUILTIN_NAMES.has(symbol.getName())) {
-    return checker.typeToString(type);
+  if (symbol) {
+    if (BUILTIN_NAMES.has(symbol.getName())) return checker.typeToString(type);
+    const decls = symbol.getDeclarations();
+    if (decls?.some(d => {
+      const f = d.getSourceFile().fileName;
+      return f.includes('/typescript/lib/') || f.includes('\\typescript\\lib\\');
+    })) {
+      return checker.typeToString(type);
+    }
   }
 
   const callSigs = type.getCallSignatures();
