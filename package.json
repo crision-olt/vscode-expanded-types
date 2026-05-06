@@ -6,7 +6,7 @@
   "publisher": "crision98",
   "repository": {
     "type": "git",
-    "url": "https://github.com/crision98/vscode-expanded-types"
+    "url": "https://github.com/crision-olt/vscode-expanded-types"
   },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Programming Languages"],
