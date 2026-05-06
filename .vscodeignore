@@ -1,10 +1,18 @@
 .vscode/**
-node_modules/**
 src/**
 tests/**
+docs/**
 *.mjs
 tsconfig.json
+vitest.config.ts
 .vscodeignore
 package-lock.json
 .claude/**
-docs/**
+*.vsix
+out/plugin/**
+out/**/*.map
+
+# Exclude all of node_modules except the bundled tsserver plugin
+node_modules/**
+!node_modules/expanded-types-plugin
+!node_modules/expanded-types-plugin/**

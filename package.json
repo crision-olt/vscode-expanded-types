@@ -4,6 +4,10 @@
   "description": "Deep-expand TypeScript types in hover tooltips",
   "version": "0.0.1",
   "publisher": "crision98",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crision98/vscode-expanded-types"
+  },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Programming Languages"],
   "keywords": ["typescript", "types", "hover", "expand", "developer tools"],
