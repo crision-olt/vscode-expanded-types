@@ -86,14 +86,14 @@ function _expandType(
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
       const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
-      return elem.includes(' | ') ? `(${elem})[]` : `${elem}[]`;
+      return (elem.includes(' | ') && !elem.startsWith('{')) ? `(${elem})[]` : `${elem}[]`;
     }
   }
   if ((checker as any).isReadonlyArrayType?.(type)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
       const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
-      return elem.includes(' | ') ? `readonly (${elem})[]` : `readonly ${elem}[]`;
+      return (elem.includes(' | ') && !elem.startsWith('{')) ? `readonly (${elem})[]` : `readonly ${elem}[]`;
     }
   }
 

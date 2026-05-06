@@ -164,6 +164,18 @@ describe('expandType', () => {
     expect(result).not.toMatch(/c:\s*\{/);
   });
 
+  it('does not wrap object array element in parens when object has union-typed properties', () => {
+    const code = `
+      interface Item { id: number | null; name: string | null; }
+      const x: Item[] = [];
+    `;
+    const { type, checker } = getTypeFromMultiDecl(code, 1);
+    const result = expandType(type, checker, ts);
+    expect(result).not.toMatch(/^\(/);
+    expect(result).toMatch(/^\{/);
+    expect(result).toMatch(/\}\[\]$/);
+  });
+
   it('expands simple tuple', () => {
     const { type, checker } = getTypeFromDecl('const x: [string, number] = ["", 0];');
     const result = expandType(type, checker, ts);
