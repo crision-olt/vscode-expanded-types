@@ -40,6 +40,25 @@ function getTypeFromMultiDecl(code: string, stmtIndex: number): { type: ts.Type;
   return { type: checker.getTypeAtLocation(decl), checker };
 }
 
+function getTypeWithLib(code: string, stmtIndex: number): { type: ts.Type; checker: ts.TypeChecker } {
+  const filename = '/virtual/test.ts';
+  const sourceFile = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true);
+  const defaultHost = ts.createCompilerHost({});
+  const host: ts.CompilerHost = {
+    ...defaultHost,
+    getSourceFile: (name, version) =>
+      name === filename ? sourceFile : defaultHost.getSourceFile(name, version),
+    fileExists: (name) => name === filename || defaultHost.fileExists(name),
+    readFile: (name) => (name === filename ? code : defaultHost.readFile(name)),
+  };
+  const program = ts.createProgram([filename], { strict: true, skipLibCheck: true }, host);
+  const checker = program.getTypeChecker();
+  const sf = program.getSourceFile(filename)!;
+  const stmt = sf.statements[stmtIndex] as ts.VariableStatement;
+  const decl = stmt.declarationList.declarations[0];
+  return { type: checker.getTypeAtLocation(decl), checker };
+}
+
 describe('expandType', () => {
   it('expands string primitive', () => {
     const { type, checker } = getTypeFromDecl('const x: string = "";');
@@ -191,5 +210,42 @@ describe('expandType', () => {
     const result = expandType(type, checker, ts);
     expect(result).toContain('[string,');
     expect(result).toContain('id: number');
+  });
+
+  it('expands Omit utility type to concrete properties', () => {
+    const code = `
+      interface Item { id: number; name: string; description: string; }
+      const x: Omit<Item, "id"> = { name: "", description: "" };
+    `;
+    const { type, checker } = getTypeWithLib(code, 1);
+    const result = expandType(type, checker, ts);
+    expect(result).toContain('name: string');
+    expect(result).toContain('description: string');
+    expect(result).not.toContain('id:');
+    expect(result).not.toContain('Omit<');
+  });
+
+  it('expands array of Omit utility type without parens', () => {
+    const code = `
+      interface Item { id: number; name: string; }
+      const x: Omit<Item, "id">[] = [];
+    `;
+    const { type, checker } = getTypeWithLib(code, 1);
+    const result = expandType(type, checker, ts);
+    expect(result).not.toMatch(/^\(/);
+    expect(result).toContain('name: string');
+    expect(result).toMatch(/\}\[\]$/);
+    expect(result).not.toContain('Omit<');
+  });
+
+  it('does not wrap non-union element in parens for generic utility type arrays', () => {
+    const code = `
+      interface Item { id: number; name: string; tags: string | null; }
+      const x: Omit<Item, "id">[] = [];
+    `;
+    const { type, checker } = getTypeWithLib(code, 1);
+    const result = expandType(type, checker, ts);
+    expect(result).not.toMatch(/^\(/);
+    expect(result).toMatch(/\}\[\]$/);
   });
 });

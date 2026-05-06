@@ -86,14 +86,14 @@ function _expandType(
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
       const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
-      return (elem.includes(' | ') && !elem.startsWith('{')) ? `(${elem})[]` : `${elem}[]`;
+      return args[0].isUnion() ? `(${elem})[]` : `${elem}[]`;
     }
   }
   if ((checker as any).isReadonlyArrayType?.(type)) {
     const args = checker.getTypeArguments(type as ts.TypeReference);
     if (args.length > 0) {
       const elem = _expandType(args[0], checker, tsModule, visited, depth, maxDepth);
-      return (elem.includes(' | ') && !elem.startsWith('{')) ? `readonly (${elem})[]` : `readonly ${elem}[]`;
+      return args[0].isUnion() ? `readonly (${elem})[]` : `readonly ${elem}[]`;
     }
   }
 
@@ -105,7 +105,10 @@ function _expandType(
       const f = d.getSourceFile().fileName;
       return f.includes('/typescript/lib/') || f.includes('\\typescript\\lib\\');
     })) {
-      return checker.typeToString(type);
+      // Utility types (Omit, Pick, Partial, etc.) resolve to real object types with
+      // user-meaningful properties — let them fall through to expandObjectType.
+      // Only bail out for built-in opaque types (Map, Set, etc.) with no properties.
+      if (type.getProperties().length === 0) return checker.typeToString(type);
     }
   }
 
