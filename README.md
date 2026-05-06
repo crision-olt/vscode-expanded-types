@@ -91,7 +91,7 @@ No additional dependencies or build tools required.
 
 1. Open VS Code
 2. Press `Ctrl+P` / `Cmd+P`
-3. Run `ext install crision98.expanded-types`
+3. Run `ext install crision-olt.expanded-types`
 
 Or search **"Expanded Types"** in the Extensions view (`Ctrl+Shift+X`).
 

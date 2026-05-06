@@ -3,7 +3,7 @@
   "displayName": "Expanded Types",
   "description": "Deep-expand TypeScript types in hover tooltips",
   "version": "0.0.1",
-  "publisher": "crision98",
+  "publisher": "crision-olt",
   "repository": {
     "type": "git",
     "url": "https://github.com/crision-olt/vscode-expanded-types"
